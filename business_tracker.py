@@ -16,10 +16,12 @@ st.markdown(
 )
 st.title("📊 家用營業額記帳系統")
 
-# 初始化資料表
-if "daily_data" not in st.session_state:
+# ==========================
+# 初始化 session_state
+# ==========================
+if "daily_data" not in st.session_state or not isinstance(st.session_state.daily_data, pd.DataFrame):
     st.session_state.daily_data = pd.DataFrame(columns=["日期", "營業額", "花費"])
-if "monthly_data" not in st.session_state:
+if "monthly_data" not in st.session_state or not isinstance(st.session_state.monthly_data, pd.DataFrame):
     st.session_state.monthly_data = pd.DataFrame(columns=[
         "月份", "店租", "水電瓦斯費", "Foodpanda", "UberEats", "賣貨便"
     ])
@@ -69,7 +71,9 @@ def edit_row(idx):
     st.experimental_rerun()
 
 def delete_row(idx):
-    st.session_state.daily_data = st.session_state.daily_data.drop(idx).reset_index(drop=True)
+    df = st.session_state.daily_data
+    df = df.drop(idx).reset_index(drop=True)
+    st.session_state.daily_data = df
     st.success(f"已刪除第 {idx+1} 筆資料！")
     st.experimental_rerun()
 
@@ -149,23 +153,22 @@ if len(st.session_state.daily_data) > 0:
     # 下載 Excel
     def to_excel(df):
         output = BytesIO()
+        try:
+            import openpyxl
+        except ImportError:
+            st.error("請先安裝 openpyxl：pip install openpyxl")
+            return None
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
             df.to_excel(writer, index=False, sheet_name="營業報表")
         return output.getvalue()
 
     excel_data = to_excel(report)
-    st.download_button(
-        label="⬇ 下載Excel報表",
-        data=excel_data,
-        file_name="monthly_report.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
+    if excel_data:
+        st.download_button(
+            label="⬇ 下載Excel報表",
+            data=excel_data,
+            file_name="monthly_report.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
 else:
     st.write("目前尚無每日資料可生成報表。")
-
-#streamlit run .\business_tracker.py     
-
-
-
-
-
