@@ -9,7 +9,7 @@ st.set_page_config(page_title="每日營業額紀錄", layout="centered")
 st.markdown(
     """
     <div style="text-align:right; color:gray; font-size:14px;">
-        2025/11/13 v3
+        2025/11/13 v4 (月度資料已新增刪除/修改功能)
     </div>
     """,
     unsafe_allow_html=True
@@ -28,9 +28,12 @@ if "monthly_data" not in st.session_state or not isinstance(st.session_state.mon
     ])
 if "edit_index" not in st.session_state:
     st.session_state.edit_index = None
+# 新增月度編輯索引
+if "monthly_edit_index" not in st.session_state:
+    st.session_state.monthly_edit_index = None
 
 # ==========================
-# 每日輸入區 - 處理修改時的預填邏輯 (Fix applied here)
+# 每日輸入區 - 處理修改時的預填邏輯 
 # ==========================
 st.header("🗓️ 每日資料輸入")
 
@@ -102,7 +105,7 @@ with colB:
             # st.experimental_rerun() 
 
 # ==========================
-# 每日紀錄顯示 + 修改/刪除
+# 每日紀錄顯示 + 修改/刪除 函數
 # ==========================
 st.write("### 📅 每日紀錄")
 
@@ -149,59 +152,164 @@ else:
     st.write("目前沒有每日紀錄。")
 
 # ==========================
-# 月度收入支出
+# 月度收入支出 函數
+# ==========================
+
+def edit_monthly_row(idx):
+    st.session_state.monthly_edit_index = idx
+
+def delete_monthly_row(idx):
+    if "monthly_data" in st.session_state and isinstance(st.session_state.monthly_data, pd.DataFrame):
+        # 刪除並重設索引是正確且穩健的做法
+        df = st.session_state.monthly_data.drop(idx).reset_index(drop=True)
+        st.session_state.monthly_data = df
+        st.success(f"已刪除第 {idx+1} 筆月度資料！")
+        # 刪除後若正在編輯，需要重置 edit_index
+        if st.session_state.monthly_edit_index == idx:
+             st.session_state.monthly_edit_index = None
+
+# ==========================
+# 月度輸入區 - 處理修改時的預填邏輯
 # ==========================
 st.header("📆 月度收入支出")
 
+monthly_df = st.session_state.monthly_data
+current_monthly_edit_index = st.session_state.monthly_edit_index
+is_monthly_editing = current_monthly_edit_index is not None
+
 # 為了讓使用者更容易編輯現有月份，我們應該先找出已儲存的月份，並將其設為預設選中
 monthly_options = [f"{i}月" for i in range(1, 13)]
-current_months = st.session_state.monthly_data["月份"].tolist()
+current_months = monthly_df["月份"].tolist()
 default_month_index = 0
 if len(current_months) > 0:
-    # 嘗試將最近一個儲存的月份設為預設值
     if current_months[-1] in monthly_options:
         default_month_index = monthly_options.index(current_months[-1])
 
-
-month = st.selectbox("選擇月份", monthly_options, index=default_month_index)
-
-# 嘗試預填選定月份的月度資料 (新增的優化)
+# 預設值
+month_input = ""
 current_rent = 0
 current_utility = 0
 current_fp = 0
 current_ue = 0
 current_mhb = 0
 
-if month in st.session_state.monthly_data["月份"].values:
-    monthly_row = st.session_state.monthly_data.loc[st.session_state.monthly_data["月份"] == month].iloc[0]
-    current_rent = int(monthly_row["店租"])
-    current_utility = int(monthly_row["水電瓦斯費"])
-    current_fp = int(monthly_row["Foodpanda"])
-    current_ue = int(monthly_row["UberEats"])
-    current_mhb = int(monthly_row["賣貨便"])
+# --- 1. 載入編輯模式的資料（優先） ---
+if is_monthly_editing:
+    try:
+        monthly_row = monthly_df.loc[current_monthly_edit_index]
+        month_input = monthly_row["月份"] # 使用索引對應的月份名稱
+        current_rent = int(monthly_row["店租"])
+        current_utility = int(monthly_row["水電瓦斯費"])
+        current_fp = int(monthly_row["Foodpanda"])
+        current_ue = int(monthly_row["UberEats"])
+        current_mhb = int(monthly_row["賣貨便"])
+    except Exception as e:
+        st.error(f"載入月度編輯資料錯誤：{e}")
+        st.session_state.monthly_edit_index = None
+        st.experimental_rerun()
+        
+    st.write(f"**正在編輯月份：** `{month_input}`")
+    st.info(f"✏️ 正在修改第 {current_monthly_edit_index + 1} 筆月度資料，修改後請按『更新月度資料』。")
+
+# --- 2. 載入選擇模式的資料（非編輯時） ---
+else:
+    month_input = st.selectbox("選擇月份", monthly_options, index=default_month_index, key="monthly_select_box")
+    if month_input in monthly_df["月份"].values:
+        # 嘗試預填選定月份的月度資料
+        monthly_row = monthly_df.loc[monthly_df["月份"] == month_input].iloc[0]
+        current_rent = int(monthly_row["店租"])
+        current_utility = int(monthly_row["水電瓦斯費"])
+        current_fp = int(monthly_row["Foodpanda"])
+        current_ue = int(monthly_row["UberEats"])
+        current_mhb = int(monthly_row["賣貨便"])
 
 
-rent = st.number_input("店租", min_value=0, step=1000, value=current_rent)
-utility = st.number_input("水電瓦斯費", min_value=0, step=500, value=current_utility)
-fp = st.number_input("Foodpanda 收入", min_value=0, step=500, value=current_fp)
-ue = st.number_input("UberEats 收入", min_value=0, step=500, value=current_ue)
-mhb = st.number_input("賣貨便 收入", min_value=0, step=500, value=current_mhb)
+# 輸入欄位
+rent = st.number_input("店租", min_value=0, step=1000, key="monthly_rent", value=current_rent)
+utility = st.number_input("水電瓦斯費", min_value=0, step=500, key="monthly_utility", value=current_utility)
+fp = st.number_input("Foodpanda 收入", min_value=0, step=500, key="monthly_fp", value=current_fp)
+ue = st.number_input("UberEats 收入", min_value=0, step=500, key="monthly_ue", value=current_ue)
+mhb = st.number_input("賣貨便 收入", min_value=0, step=500, key="monthly_mhb", value=current_mhb)
 
-if st.button("💾 儲存月度資料"):
-    if month in st.session_state.monthly_data["月份"].values:
-        # 使用 loc 進行精確更新
-        st.session_state.monthly_data.loc[st.session_state.monthly_data["月份"] == month,
-                                         ["店租", "水電瓦斯費", "Foodpanda", "UberEats", "賣貨便"]] = [rent, utility, fp, ue, mhb]
-        st.info(f"已更新 {month} 的月度資料。")
-    else:
-        new_row = pd.DataFrame([[month, rent, utility, fp, ue, mhb]], columns=[
-            "月份", "店租", "水電瓦斯費", "Foodpanda", "UberEats", "賣貨便"
-        ])
-        st.session_state.monthly_data = pd.concat([st.session_state.monthly_data, new_row], ignore_index=True)
-        st.success("已儲存！")
+# 儲存/更新按鈕邏輯
+colC, colD = st.columns(2)
 
+if is_monthly_editing:
+    with colC:
+        if st.button("✅ 更新月度資料"):
+            # 更新指定索引的資料
+            monthly_df.at[current_monthly_edit_index, "月份"] = month_input
+            monthly_df.at[current_monthly_edit_index, "店租"] = rent
+            monthly_df.at[current_monthly_edit_index, "水電瓦斯費"] = utility
+            monthly_df.at[current_monthly_edit_index, "Foodpanda"] = fp
+            monthly_df.at[current_monthly_edit_index, "UberEats"] = ue
+            monthly_df.at[current_monthly_edit_index, "賣貨便"] = mhb
+            st.session_state.monthly_edit_index = None
+            st.success(f"月度資料已更新！")
+    with colD:
+        if st.button("❌ 取消編輯"):
+            st.session_state.monthly_edit_index = None
+            # 需要強制 Rerun 讓 Selectbox 恢復
+            st.experimental_rerun()
+else:
+    with colC:
+        if st.button("💾 儲存月度資料"):
+            if month_input in monthly_df["月份"].values:
+                # 若月份已存在，則更新
+                monthly_df.loc[monthly_df["月份"] == month_input,
+                                             ["店租", "水電瓦斯費", "Foodpanda", "UberEats", "賣貨便"]] = [rent, utility, fp, ue, mhb]
+                st.info(f"已更新 {month_input} 的月度資料。")
+            else:
+                # 否則新增
+                new_row = pd.DataFrame([[month_input, rent, utility, fp, ue, mhb]], columns=[
+                    "月份", "店租", "水電瓦斯費", "Foodpanda", "UberEats", "賣貨便"
+                ])
+                st.session_state.monthly_data = pd.concat([monthly_df, new_row], ignore_index=True)
+                st.success("已儲存！")
+
+# ==========================
+# 月度紀錄顯示 + 修改/刪除
+# ==========================
 st.write("### 📊 月度收入支出資料")
-st.dataframe(st.session_state.monthly_data)
+
+if len(st.session_state.monthly_data) > 0:
+    # 設置標題欄位
+    header_cols = st.columns([1, 1, 1, 1, 1, 1, 0.5, 0.5])
+    headers = ["月份", "店租", "水電瓦斯費", "Foodpanda", "UberEats", "賣貨便", "修改", "刪除"]
+    for hc, h in zip(header_cols, headers):
+        hc.markdown(f"**{h}**")
+        
+    st.markdown("---")
+
+    # 迴圈顯示資料和按鈕
+    df_m = st.session_state.monthly_data
+    for i, row in df_m.iterrows():
+        # 8個欄位：6個數據 + 2個按鈕
+        cols = st.columns([1, 1, 1, 1, 1, 1, 0.5, 0.5])
+        
+        # 顯示數據 (使用 :,.0f 確保格式化為千位分隔且無小數)
+        cols[0].write(row["月份"])
+        cols[1].write(f"{int(row['店租']):,.0f}")
+        cols[2].write(f"{int(row['水電瓦斯費']):,.0f}")
+        cols[3].write(f"{int(row['Foodpanda']):,.0f}")
+        cols[4].write(f"{int(row['UberEats']):,.0f}")
+        cols[5].write(f"{int(row['賣貨便']):,.0f}")
+        
+        # 動作按鈕
+        is_current_edit = (st.session_state.monthly_edit_index == i)
+        
+        # 讓修改按鈕在編輯狀態下被禁用 (確保一次只能編輯一個)
+        if cols[6].button("✏️", key=f"edit_monthly_{i}", disabled=st.session_state.monthly_edit_index is not None and not is_current_edit):
+            edit_monthly_row(i)
+        
+        # 刪除按鈕
+        if cols[7].button("🗑️", key=f"delete_monthly_{i}"):
+            delete_monthly_row(i)
+            # 按鈕點擊會觸發 Rerun，確保資料更新
+            
+else:
+    st.write("目前沒有月度紀錄。")
+
 
 # ==========================
 # 盈餘報表
