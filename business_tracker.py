@@ -5,6 +5,15 @@ from io import BytesIO
 
 st.set_page_config(page_title="每日營業額紀錄", layout="centered")
 
+# 右上角版本資訊
+st.markdown(
+    """
+    <div style="text-align:right; color:gray; font-size:14px;">
+        2025/11/13 v1
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 st.title("📊 家用營業額記帳系統")
 
 # 初始化資料表
@@ -144,3 +153,4 @@ if len(st.session_state.daily_data) > 0:
     )
 else:
     st.write("目前尚無每日資料可生成報表。")
+
