@@ -9,7 +9,7 @@ st.set_page_config(page_title="每日營業額紀錄", layout="centered")
 st.markdown(
     """
     <div style="text-align:right; color:gray; font-size:14px;">
-        2025/11/13 v2 (已修正編輯預填功能, 修正刪除錯誤)
+        2025/11/13 v3
     </div>
     """,
     unsafe_allow_html=True
@@ -98,7 +98,8 @@ with colB:
             st.session_state.daily_data.at[idx, "花費"] = expense
             st.session_state.edit_index = None
             st.success("資料已更新！")
-            st.experimental_rerun() # 更新後立即刷新頁面，確保輸入欄位恢復預設值
+            # 修正：移除 st.experimental_rerun()，因為按鈕點擊已觸發 Rerun
+            # st.experimental_rerun() 
 
 # ==========================
 # 每日紀錄顯示 + 修改/刪除
@@ -118,8 +119,7 @@ def delete_row(idx):
         # 刪除後若正在編輯，需要重置 edit_index
         if st.session_state.edit_index == idx:
              st.session_state.edit_index = None
-        # 修正：移除 st.experimental_rerun()，避免多重 Rerun 衝突
-        # st.experimental_rerun() 
+        # 修正：移除 st.experimental_rerun()
 
 if len(st.session_state.daily_data) > 0:
     # 確保日期格式一致，避免顯示問題
