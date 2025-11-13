@@ -59,7 +59,19 @@ with colB:
             st.session_state.edit_index = None
             st.success("資料已更新！")
 
+# ==========================
+# 每日紀錄顯示 + 修改/刪除
+# ==========================
 st.write("### 📅 每日紀錄")
+
+def edit_row(idx):
+    st.session_state.edit_index = idx
+    st.experimental_rerun()
+
+def delete_row(idx):
+    st.session_state.daily_data = st.session_state.daily_data.drop(idx).reset_index(drop=True)
+    st.success(f"已刪除第 {idx+1} 筆資料！")
+    st.experimental_rerun()
 
 if len(st.session_state.daily_data) > 0:
     df = st.session_state.daily_data.reset_index(drop=True)
@@ -69,12 +81,9 @@ if len(st.session_state.daily_data) > 0:
         cols[1].write(f"💰 {int(row['營業額'])}")
         cols[2].write(f"💸 {int(row['花費'])}")
         if cols[3].button("✏️ 修改", key=f"edit_{i}"):
-            st.session_state.edit_index = i
-            st.experimental_rerun()
+            edit_row(i)
         if cols[4].button("🗑️ 刪除", key=f"delete_{i}"):
-            st.session_state.daily_data = st.session_state.daily_data.drop(i).reset_index(drop=True)
-            st.success(f"已刪除第 {i+1} 筆資料！")
-            st.experimental_rerun()
+            delete_row(i)
 else:
     st.write("目前沒有每日紀錄。")
 
@@ -155,6 +164,7 @@ else:
     st.write("目前尚無每日資料可生成報表。")
 
 #streamlit run .\business_tracker.py     
+
 
 
 
