@@ -9,7 +9,7 @@ st.set_page_config(page_title="每日營業額紀錄", layout="centered")
 st.markdown(
     """
     <div style="text-align:right; color:gray; font-size:14px;">
-        2025/11/13 v1
+        2025/11/13 v2
     </div>
     """,
     unsafe_allow_html=True
@@ -71,19 +71,21 @@ def edit_row(idx):
     st.experimental_rerun()
 
 def delete_row(idx):
-    df = st.session_state.daily_data
-    df = df.drop(idx).reset_index(drop=True)
-    st.session_state.daily_data = df
-    st.success(f"已刪除第 {idx+1} 筆資料！")
-    st.experimental_rerun()
+    if "daily_data" in st.session_state and isinstance(st.session_state.daily_data, pd.DataFrame):
+        df = st.session_state.daily_data.drop(idx).reset_index(drop=True)
+        st.session_state.daily_data = df
+        st.success(f"已刪除第 {idx+1} 筆資料！")
+        st.experimental_rerun()
 
 if len(st.session_state.daily_data) > 0:
     df = st.session_state.daily_data.reset_index(drop=True)
     for i, row in df.iterrows():
         cols = st.columns([3, 2, 2, 1, 1])
         cols[0].write(str(row["日期"]))
-        cols[1].write(f"💰 {int(row['營業額'])}")
-        cols[2].write(f"💸 {int(row['花費'])}")
+        rev = int(row["營業額"]) if pd.notna(row["營業額"]) else 0
+        exp = int(row["花費"]) if pd.notna(row["花費"]) else 0
+        cols[1].write(f"💰 {rev}")
+        cols[2].write(f"💸 {exp}")
         if cols[3].button("✏️ 修改", key=f"edit_{i}"):
             edit_row(i)
         if cols[4].button("🗑️ 刪除", key=f"delete_{i}"):
