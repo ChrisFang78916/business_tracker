@@ -386,3 +386,4 @@ if len(st.session_state.daily_data) > 0:
         )
 else:
     st.write("目前尚無每日資料可生成報表。")
+
