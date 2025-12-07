@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import date
-from io import BytesIO
+# from io import BytesIO # 已刪除：不再需要 BytesIO
 
 st.set_page_config(page_title="每日營業額紀錄", layout="centered")
 
@@ -381,29 +381,9 @@ if len(st.session_state.daily_data) > 0:
     st.write(f"**全年外送平台收入：** {total_delivery:,.0f} 元")
     st.write(f"### 💵 全年總盈餘：{total_profit:,.0f} 元")
 
-    # 下載 Excel
-    def to_excel(df):
-        output = BytesIO()
-        try:
-            # openpyxl 雖然通常預裝在 Streamlit 環境，但加上檢查是個好習慣
-            import openpyxl 
-        except ImportError:
-            # 在 Streamlit 環境中，通常不需要使用者額外安裝
-            st.error("缺少 openpyxl 函式庫，無法生成 Excel。")
-            return None
-        with pd.ExcelWriter(output, engine="openpyxl") as writer:
-            # 報表包含計算欄位，適合匯出
-            df.to_excel(writer, index=False, sheet_name="月盈餘報表")
-        return output.getvalue()
+    # 已刪除：def to_excel 函式
 
-    excel_data = to_excel(report)
-    if excel_data:
-        st.download_button(
-            label="⬇ 下載Excel報表",
-            data=excel_data,
-            file_name="monthly_report.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
+    # 已刪除：下載 Excel 按鈕 (st.download_button)
+    
 else:
     st.write("目前尚無每日資料可生成報表。")
-
