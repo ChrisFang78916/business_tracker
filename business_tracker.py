@@ -23,9 +23,8 @@ if "daily_data" not in st.session_state or not isinstance(st.session_state.daily
     # 確保日期欄位 dtype 是 datetime64[ns]，方便後續操作
     st.session_state.daily_data = pd.DataFrame(columns=["日期", "營業額", "花費"])
 if "monthly_data" not in st.session_state or not isinstance(st.session_state.monthly_data, pd.DataFrame):
-    # 【修改 1：新增 "員工薪資" 和 "貨款支出" 欄位】
     st.session_state.monthly_data = pd.DataFrame(columns=[
-        "月份", "店租", "水電瓦斯費", "員工薪資", "貨款支出", "Foodpanda", "UberEats", "賣貨便"
+        "月份", "店租", "水電瓦斯費", "Foodpanda", "UberEats", "賣貨便"
     ])
 if "edit_index" not in st.session_state:
     st.session_state.edit_index = None
@@ -190,8 +189,6 @@ if len(current_months) > 0:
 month_input = ""
 current_rent = 0
 current_utility = 0
-current_salary = 0
-current_goods_cost = 0 # 【修改 2：新增貨款支出預設值】
 current_fp = 0
 current_ue = 0
 current_mhb = 0
@@ -203,8 +200,6 @@ if is_monthly_editing:
         month_input = monthly_row["月份"] # 使用索引對應的月份名稱
         current_rent = int(monthly_row["店租"])
         current_utility = int(monthly_row["水電瓦斯費"])
-        current_salary = int(monthly_row["員工薪資"])
-        current_goods_cost = int(monthly_row["貨款支出"]) # 【修改 3：載入編輯模式的貨款支出】
         current_fp = int(monthly_row["Foodpanda"])
         current_ue = int(monthly_row["UberEats"])
         current_mhb = int(monthly_row["賣貨便"])
@@ -224,8 +219,6 @@ else:
         monthly_row = monthly_df.loc[monthly_df["月份"] == month_input].iloc[0]
         current_rent = int(monthly_row["店租"])
         current_utility = int(monthly_row["水電瓦斯費"])
-        current_salary = int(monthly_row["員工薪資"])
-        current_goods_cost = int(monthly_row["貨款支出"]) # 【修改 4：載入選擇模式的貨款支出】
         current_fp = int(monthly_row["Foodpanda"])
         current_ue = int(monthly_row["UberEats"])
         current_mhb = int(monthly_row["賣貨便"])
@@ -234,8 +227,6 @@ else:
 # 輸入欄位
 rent = st.number_input("店租", min_value=0, step=1000, key="monthly_rent", value=current_rent)
 utility = st.number_input("水電瓦斯費", min_value=0, step=500, key="monthly_utility", value=current_utility)
-salary = st.number_input("員工薪資", min_value=0, step=1000, key="monthly_salary", value=current_salary)
-goods_cost = st.number_input("貨款支出", min_value=0, step=1000, key="monthly_goods_cost", value=current_goods_cost) # 【修改 5：新增貨款支出輸入欄位】
 fp = st.number_input("Foodpanda 收入", min_value=0, step=500, key="monthly_fp", value=current_fp)
 ue = st.number_input("UberEats 收入", min_value=0, step=500, key="monthly_ue", value=current_ue)
 mhb = st.number_input("賣貨便 收入", min_value=0, step=500, key="monthly_mhb", value=current_mhb)
@@ -250,8 +241,6 @@ if is_monthly_editing:
             monthly_df.at[current_monthly_edit_index, "月份"] = month_input
             monthly_df.at[current_monthly_edit_index, "店租"] = rent
             monthly_df.at[current_monthly_edit_index, "水電瓦斯費"] = utility
-            monthly_df.at[current_monthly_edit_index, "員工薪資"] = salary
-            monthly_df.at[current_monthly_edit_index, "貨款支出"] = goods_cost # 【修改 6：更新貨款支出欄位】
             monthly_df.at[current_monthly_edit_index, "Foodpanda"] = fp
             monthly_df.at[current_monthly_edit_index, "UberEats"] = ue
             monthly_df.at[current_monthly_edit_index, "賣貨便"] = mhb
@@ -265,17 +254,16 @@ if is_monthly_editing:
 else:
     with colC:
         if st.button("💾 儲存月度資料"):
-            # 儲存/更新的欄位列表
-            monthly_cols = ["店租", "水電瓦斯費", "員工薪資", "貨款支出", "Foodpanda", "UberEats", "賣貨便"]
-            monthly_values = [rent, utility, salary, goods_cost, fp, ue, mhb] # 【修改 7：調整值列表】
-
             if month_input in monthly_df["月份"].values:
                 # 若月份已存在，則更新
-                monthly_df.loc[monthly_df["月份"] == month_input, monthly_cols] = monthly_values
+                monthly_df.loc[monthly_df["月份"] == month_input,
+                                             ["店租", "水電瓦斯費", "Foodpanda", "UberEats", "賣貨便"]] = [rent, utility, fp, ue, mhb]
                 st.info(f"已更新 {month_input} 的月度資料。")
             else:
                 # 否則新增
-                new_row = pd.DataFrame([ [month_input] + monthly_values ], columns=[ "月份" ] + monthly_cols)
+                new_row = pd.DataFrame([[month_input, rent, utility, fp, ue, mhb]], columns=[
+                    "月份", "店租", "水電瓦斯費", "Foodpanda", "UberEats", "賣貨便"
+                ])
                 st.session_state.monthly_data = pd.concat([monthly_df, new_row], ignore_index=True)
                 st.success("已儲存！")
 
@@ -286,9 +274,8 @@ st.write("### 📊 月度收入支出資料")
 
 if len(st.session_state.monthly_data) > 0:
     # 設置標題欄位
-    # 【修改 8：新增 "貨款支出" 標題】
-    header_cols = st.columns([1, 1, 1, 1, 1, 1, 1, 1, 0.5, 0.5]) # 10 欄：7個數據 + 月份 + 2個按鈕
-    headers = ["月份", "店租", "水電瓦斯費", "員工薪資", "貨款支出", "Foodpanda", "UberEats", "賣貨便", "修改", "刪除"]
+    header_cols = st.columns([1, 1, 1, 1, 1, 1, 0.5, 0.5])
+    headers = ["月份", "店租", "水電瓦斯費", "Foodpanda", "UberEats", "賣貨便", "修改", "刪除"]
     for hc, h in zip(header_cols, headers):
         hc.markdown(f"**{h}**")
         
@@ -297,29 +284,28 @@ if len(st.session_state.monthly_data) > 0:
     # 迴圈顯示資料和按鈕
     df_m = st.session_state.monthly_data
     for i, row in df_m.iterrows():
-        # 10個欄位：7個數據 + 月份 + 2個按鈕 (欄位數需與 header_cols 一致)
-        cols = st.columns([1, 1, 1, 1, 1, 1, 1, 1, 0.5, 0.5])
+        # 8個欄位：6個數據 + 2個按鈕
+        cols = st.columns([1, 1, 1, 1, 1, 1, 0.5, 0.5])
         
         # 顯示數據 (使用 :,.0f 確保格式化為千位分隔且無小數)
         cols[0].write(row["月份"])
         cols[1].write(f"{int(row['店租']):,.0f}")
         cols[2].write(f"{int(row['水電瓦斯費']):,.0f}")
-        cols[3].write(f"{int(row['員工薪資']):,.0f}")
-        cols[4].write(f"{int(row['貨款支出']):,.0f}") # 【修改 9：顯示貨款支出數據】
-        cols[5].write(f"{int(row['Foodpanda']):,.0f}")
-        cols[6].write(f"{int(row['UberEats']):,.0f}")
-        cols[7].write(f"{int(row['賣貨便']):,.0f}")
+        cols[3].write(f"{int(row['Foodpanda']):,.0f}")
+        cols[4].write(f"{int(row['UberEats']):,.0f}")
+        cols[5].write(f"{int(row['賣貨便']):,.0f}")
         
-        # 動作按鈕 (索引需調整)
+        # 動作按鈕
         is_current_edit = (st.session_state.monthly_edit_index == i)
         
         # 讓修改按鈕在編輯狀態下被禁用 (確保一次只能編輯一個)
-        if cols[8].button("✏️", key=f"edit_monthly_{i}", disabled=st.session_state.monthly_edit_index is not None and not is_current_edit):
+        if cols[6].button("✏️", key=f"edit_monthly_{i}", disabled=st.session_state.monthly_edit_index is not None and not is_current_edit):
             edit_monthly_row(i)
         
         # 刪除按鈕
-        if cols[9].button("🗑️", key=f"delete_monthly_{i}"):
+        if cols[7].button("🗑️", key=f"delete_monthly_{i}"):
             delete_monthly_row(i)
+            # 按鈕點擊會觸發 Rerun，確保資料更新
             
 else:
     st.write("目前沒有月度紀錄。")
@@ -348,18 +334,15 @@ if len(st.session_state.daily_data) > 0:
     report = pd.merge(monthly_sum, st.session_state.monthly_data, on="月份", how="left").fillna(0)
     
     # 確保所有數字欄位都是數值類型，避免計算錯誤
-    # 【修改 10：新增 "員工薪資" 和 "貨款支出" 到數值欄位】
-    numeric_cols = ["營業額", "花費", "店租", "水電瓦斯費", "員工薪資", "貨款支出", "Foodpanda", "UberEats", "賣貨便"]
+    numeric_cols = ["營業額", "花費", "店租", "水電瓦斯費", "Foodpanda", "UberEats", "賣貨便"]
     for col in numeric_cols:
         report[col] = pd.to_numeric(report[col], errors='coerce').fillna(0)
 
 
     report["外送收入總和"] = report["Foodpanda"] + report["UberEats"] + report["賣貨便"]
-    # 【修改 11：在盈餘計算中減去 "員工薪資" 和 "貨款支出"】
-    report["盈餘"] = report["營業額"] + report["外送收入總和"] - report["花費"] - report["店租"] - report["水電瓦斯費"] - report["員工薪資"] - report["貨款支出"]
+    report["盈餘"] = report["營業額"] + report["外送收入總和"] - report["花費"] - report["店租"] - report["水電瓦斯費"]
 
-    # 【修改 12：在顯示報表時加入 "員工薪資" 和 "貨款支出" 欄位】
-    st.dataframe(report[["月份", "營業額", "花費", "店租", "水電瓦斯費", "員工薪資", "貨款支出", "外送收入總和", "盈餘"]])
+    st.dataframe(report[["月份", "營業額", "花費", "店租", "水電瓦斯費", "外送收入總和", "盈餘"]])
 
     # ==========================
     # 年度總結
@@ -369,15 +352,12 @@ if len(st.session_state.daily_data) > 0:
     total_expense = report["花費"].sum()
     total_rent = report["店租"].sum()
     total_utility = report["水電瓦斯費"].sum()
-    total_salary = report["員工薪資"].sum()
-    total_goods_cost = report["貨款支出"].sum() # 【修改 13：計算全年貨款支出總和】
     total_delivery = report["外送收入總和"].sum()
     total_profit = report["盈餘"].sum()
 
     st.write(f"**全年營業總額：** {total_revenue:,.0f} 元")
     st.write(f"**全年花費總額：** {total_expense:,.0f} 元")
-    # 【修改 14：顯示全年店租、水電瓦斯、薪資和貨款支出總和】
-    st.write(f"**全年店租＋水電瓦斯＋員工薪資＋貨款支出：** {total_rent + total_utility + total_salary + total_goods_cost:,.0f} 元") 
+    st.write(f"**全年店租＋水電瓦斯：** {total_rent + total_utility:,.0f} 元")
     st.write(f"**全年外送平台收入：** {total_delivery:,.0f} 元")
     st.write(f"### 💵 全年總盈餘：{total_profit:,.0f} 元")
 
