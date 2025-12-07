@@ -1,7 +1,13 @@
 import streamlit as st
 import pandas as pd
 from datetime import date
-# from io import BytesIO # 已刪除：不再需要 BytesIO
+from io import BytesIO
+import os
+
+# --- 【新增 1：定義資料檔案名稱】 ---
+DAILY_FILE = "daily_records.csv"
+MONTHLY_FILE = "monthly_records.csv"
+# ------------------------------------
 
 st.set_page_config(page_title="每日營業額紀錄", layout="centered")
 
@@ -9,7 +15,7 @@ st.set_page_config(page_title="每日營業額紀錄", layout="centered")
 st.markdown(
     """
     <div style="text-align:right; color:gray; font-size:14px;">
-        2025/11/13 v4 (月度資料已新增刪除/修改功能)
+    2025/11/13 v4 (月度資料已新增刪除/修改功能)
     </div>
     """,
     unsafe_allow_html=True
@@ -17,16 +23,48 @@ st.markdown(
 st.title("📊 家用營業額記帳系統")
 
 # ==========================
-# 初始化 session_state
+# 初始化 session_state (已整合檔案讀取邏輯)
 # ==========================
-if "daily_data" not in st.session_state or not isinstance(st.session_state.daily_data, pd.DataFrame):
-    # 確保日期欄位 dtype 是 datetime64[ns]，方便後續操作
-    st.session_state.daily_data = pd.DataFrame(columns=["日期", "營業額", "花費"])
-if "monthly_data" not in st.session_state or not isinstance(st.session_state.monthly_data, pd.DataFrame):
-    # 【修改 1：新增 "員工薪資" 和 "貨款支出" 欄位】
-    st.session_state.monthly_data = pd.DataFrame(columns=[
-        "月份", "店租", "水電瓦斯費", "員工薪資", "貨款支出", "Foodpanda", "UberEats", "賣貨便"
-    ])
+
+# --- 【修改：讀取每日資料】 ---
+if "daily_data" not in st.session_state:
+    if os.path.exists(DAILY_FILE):
+        try:
+            # 讀取檔案，並確保日期欄位是正確的類型
+            st.session_state.daily_data = pd.read_csv(
+                DAILY_FILE,
+                parse_dates=["日期"] 
+            )
+            # 確保 '營業額' 和 '花費' 是數值類型
+            st.session_state.daily_data["營業額"] = pd.to_numeric(st.session_state.daily_data["營業額"], errors='coerce').fillna(0).astype(int)
+            st.session_state.daily_data["花費"] = pd.to_numeric(st.session_state.daily_data["花費"], errors='coerce').fillna(0).astype(int)
+        except Exception as e:
+            st.error(f"讀取每日資料錯誤，將重設資料：{e}")
+            st.session_state.daily_data = pd.DataFrame(columns=["日期", "營業額", "花費"])
+    else:
+        st.session_state.daily_data = pd.DataFrame(columns=["日期", "營業額", "花費"])
+# -----------------------------
+
+# --- 【修改：讀取月度資料】 ---
+if "monthly_data" not in st.session_state:
+    if os.path.exists(MONTHLY_FILE):
+        try:
+            st.session_state.monthly_data = pd.read_csv(MONTHLY_FILE)
+            # 確保所有數值欄位是整數
+            numeric_cols = ["店租", "水電瓦斯費", "員工薪資", "貨款支出", "Foodpanda", "UberEats", "賣貨便"]
+            for col in numeric_cols:
+                 st.session_state.monthly_data[col] = pd.to_numeric(st.session_state.monthly_data[col], errors='coerce').fillna(0).astype(int)
+        except Exception as e:
+            st.error(f"讀取月度資料錯誤，將重設資料：{e}")
+            st.session_state.monthly_data = pd.DataFrame(columns=[
+                "月份", "店租", "水電瓦斯費", "員工薪資", "貨款支出", "Foodpanda", "UberEats", "賣貨便"
+            ])
+    else:
+        st.session_state.monthly_data = pd.DataFrame(columns=[
+            "月份", "店租", "水電瓦斯費", "員工薪資", "貨款支出", "Foodpanda", "UberEats", "賣貨便"
+        ])
+# -----------------------------
+
 if "edit_index" not in st.session_state:
     st.session_state.edit_index = None
 # 新增月度編輯索引
@@ -91,6 +129,10 @@ with colA:
         new_row = pd.DataFrame([[today, revenue, expense]], columns=["日期", "營業額", "花費"])
         st.session_state.daily_data = pd.concat([st.session_state.daily_data, new_row], ignore_index=True)
         st.success("已儲存！")
+        
+        # --- 【新增 2A：儲存時寫回檔案】 ---
+        st.session_state.daily_data.to_csv(DAILY_FILE, index=False)
+        # ------------------------------------
 
 with colB:
     if st.session_state.edit_index is not None:
@@ -102,8 +144,11 @@ with colB:
             st.session_state.daily_data.at[idx, "花費"] = expense
             st.session_state.edit_index = None
             st.success("資料已更新！")
+            
+            # --- 【新增 2B：更新時寫回檔案】 ---
+            st.session_state.daily_data.to_csv(DAILY_FILE, index=False)
+            # ------------------------------------
             # 修正：移除 st.experimental_rerun()，因為按鈕點擊已觸發 Rerun
-            # st.experimental_rerun() 
 
 # ==========================
 # 每日紀錄顯示 + 修改/刪除 函數
@@ -120,6 +165,11 @@ def delete_row(idx):
         df = st.session_state.daily_data.drop(idx).reset_index(drop=True)
         st.session_state.daily_data = df
         st.success(f"已刪除第 {idx+1} 筆資料！")
+        
+        # --- 【新增 2C：刪除時寫回檔案】 ---
+        st.session_state.daily_data.to_csv(DAILY_FILE, index=False)
+        # ------------------------------------
+        
         # 刪除後若正在編輯，需要重置 edit_index
         if st.session_state.edit_index == idx:
              st.session_state.edit_index = None
@@ -136,8 +186,8 @@ if len(st.session_state.daily_data) > 0:
         # 處理可能的 NaN/None 值，確保能轉換成 int
         rev = int(row["營業額"]) if pd.notna(row["營業額"]) else 0
         exp = int(row["花費"]) if pd.notna(row["花費"]) else 0
-        cols[1].write(f"💰 {rev}")
-        cols[2].write(f"💸 {exp}")
+        cols[1].write(f"💰 {rev:,.0f}")
+        cols[2].write(f"💸 {exp:,.0f}")
         
         # 只有在非編輯模式下才允許修改，防止多個編輯按鈕被點擊
         is_current_edit = (st.session_state.edit_index == i)
@@ -165,6 +215,11 @@ def delete_monthly_row(idx):
         df = st.session_state.monthly_data.drop(idx).reset_index(drop=True)
         st.session_state.monthly_data = df
         st.success(f"已刪除第 {idx+1} 筆月度資料！")
+        
+        # --- 【新增 2D：月度刪除時寫回檔案】 ---
+        st.session_state.monthly_data.to_csv(MONTHLY_FILE, index=False)
+        # ------------------------------------
+        
         # 刪除後若正在編輯，需要重置 edit_index
         if st.session_state.monthly_edit_index == idx:
              st.session_state.monthly_edit_index = None
@@ -257,6 +312,11 @@ if is_monthly_editing:
             monthly_df.at[current_monthly_edit_index, "賣貨便"] = mhb
             st.session_state.monthly_edit_index = None
             st.success(f"月度資料已更新！")
+            
+            # --- 【新增 2E：月度更新時寫回檔案】 ---
+            st.session_state.monthly_data.to_csv(MONTHLY_FILE, index=False)
+            # ------------------------------------
+            
     with colD:
         if st.button("❌ 取消編輯"):
             st.session_state.monthly_edit_index = None
@@ -278,6 +338,11 @@ else:
                 new_row = pd.DataFrame([ [month_input] + monthly_values ], columns=[ "月份" ] + monthly_cols)
                 st.session_state.monthly_data = pd.concat([monthly_df, new_row], ignore_index=True)
                 st.success("已儲存！")
+                
+            # --- 【新增 2F：月度儲存時寫回檔案】 ---
+            st.session_state.monthly_data.to_csv(MONTHLY_FILE, index=False)
+            # ------------------------------------
+
 
 # ==========================
 # 月度紀錄顯示 + 修改/刪除
@@ -381,9 +446,28 @@ if len(st.session_state.daily_data) > 0:
     st.write(f"**全年外送平台收入：** {total_delivery:,.0f} 元")
     st.write(f"### 💵 全年總盈餘：{total_profit:,.0f} 元")
 
-    # 已刪除：def to_excel 函式
+    # 下載 Excel
+    def to_excel(df):
+        output = BytesIO()
+        try:
+            # openpyxl 雖然通常預裝在 Streamlit 環境，但加上檢查是個好習慣
+            import openpyxl 
+        except ImportError:
+            # 在 Streamlit 環境中，通常不需要使用者額外安裝
+            st.error("缺少 openpyxl 函式庫，無法生成 Excel。")
+            return None
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            # 報表包含計算欄位，適合匯出
+            df.to_excel(writer, index=False, sheet_name="月盈餘報表")
+        return output.getvalue()
 
-    # 已刪除：下載 Excel 按鈕 (st.download_button)
-    
+    excel_data = to_excel(report)
+    if excel_data:
+        st.download_button(
+            label="⬇ 下載Excel報表",
+            data=excel_data,
+            file_name="monthly_report.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
 else:
     st.write("目前尚無每日資料可生成報表。")
